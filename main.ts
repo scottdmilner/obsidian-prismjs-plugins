@@ -70,7 +70,7 @@ export default class MyPlugin extends Plugin {
 			
 			// Force Prism update on PDF export
 			const printMediaQueryList = window.matchMedia('print');
-			printMediaQueryList.addEventListener('change', (mql: MediaQueryListEvent) => global.Prism.highlightAll());
+			printMediaQueryList.addEventListener('change', (mql: MediaQueryListEvent) => Prism.highlightAll());
 
 			// Configure lineNumbers plugin
 			new Promise(getLineNumbers).then((lineNumbers) => {
