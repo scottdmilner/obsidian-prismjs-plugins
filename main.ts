@@ -54,12 +54,16 @@ export default class MyPlugin extends Plugin {
 			script.textContent = lineNumbers;
 			script.id = 'better-prism';
 			document.body.appendChild(script);
-
+			
+			const printMediaQueryList = window.matchMedia('print');
+			printMediaQueryList.addEventListener('change', (mql: MediaQueryListEvent) => global.Prism.highlightAll());
+			
 			new Promise(waitForLineNumbers).then((lineNumbers) => {
 				lineNumbers.assumeViewportIndependence = false;
 				Prism.highlightAll();
 			});
 		});
+
 	}
 
 	onunload() {
