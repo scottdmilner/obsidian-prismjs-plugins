@@ -20,45 +20,60 @@ export default class MyPlugin extends Plugin {
 
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
-		const waitForPrism = (resolve: (val: typeof global.Prism) => void) => {
+		/**
+		 * Promise helper function to wait until Prism appears in the global 
+		 * 	namespace (the first time Reading View is loaded)
+		 * @param resolve 
+		 */
+		const getPrism = (resolve: (val: typeof global.Prism) => void) => {
 			if (global?.Prism) 
 				resolve(global.Prism);
 			else 
-				setTimeout(waitForPrism.bind(waitForPrism, resolve), 100);
+				setTimeout(getPrism.bind(getPrism, resolve), 100);
 		}
 		
-		const waitForLineNumbers = (resolve: (val: typeof global.Prism.plugins.lineNumbers) => void) => {
+		/**
+		 * Promise helper function to wait until the line-numbers plugin
+		 * 	appears in the global namespace
+		 * @param resolve 
+		 */
+		const getLineNumbers = (resolve: (val: typeof global.Prism.plugins.lineNumbers) => void) => {
 			if (global.Prism?.plugins?.lineNumbers) 
 				resolve(global.Prism.plugins.lineNumbers);
 			else 
-				setTimeout(waitForLineNumbers.bind(waitForLineNumbers, resolve), 30);
+				setTimeout(getLineNumbers.bind(getLineNumbers, resolve), 30);
 		}
-
+		
+		/** */
 		this.registerMarkdownPostProcessor((element: HTMLElement, context: MarkdownPostProcessorContext) => {
-			const codeblocks = element.querySelectorAll("pre");
+			const codeblocks = element.querySelectorAll('pre');
 			codeblocks.forEach(pre => {
-				if (pre.children[0].tagName == 'CODE'
-					&& !pre.classList.contains('line-numbers')) {
-						pre.classList.add('line-numbers');
+				if (pre.children[0].tagName == 'CODE'              // check that it's a code block
+					&& !pre.classList.contains('line-numbers')) {  // if there's no line numbers yet
+						pre.classList.add('line-numbers');         // add line numbers
 				}
 			});
 
 			if (codeblocks.length) {
-				new Promise(waitForPrism).then((Prism: typeof global.Prism) => Prism.highlightAll());
+				// Force prism update
+				new Promise(getPrism).then((Prism: typeof global.Prism) => Prism.highlightAll());
 			}
 		});
 
-
-		new Promise(waitForPrism).then((Prism: typeof global.Prism) => {
+		// wait until Prism loads
+		new Promise(getPrism).then((Prism: typeof global.Prism) => {
+			// Inject line-numbers script
 			const script = document.createElement("script");
 			script.textContent = lineNumbers;
-			script.id = 'better-prism';
+			script.id = 'line-numbers';
 			document.body.appendChild(script);
 			
+			// Force Prism update on PDF export
 			const printMediaQueryList = window.matchMedia('print');
 			printMediaQueryList.addEventListener('change', (mql: MediaQueryListEvent) => global.Prism.highlightAll());
-			
-			new Promise(waitForLineNumbers).then((lineNumbers) => {
+
+			// Configure lineNumbers plugin
+			new Promise(getLineNumbers).then((lineNumbers) => {
 				lineNumbers.assumeViewportIndependence = false;
 				Prism.highlightAll();
 			});
@@ -67,7 +82,13 @@ export default class MyPlugin extends Plugin {
 	}
 
 	onunload() {
-
+		const codeblocks = document.body.querySelectorAll('pre');
+		codeblocks.forEach(pre => {
+			if (pre.children[0].tagName == 'CODE'             // check that it's a code block
+				&& pre.classList.contains('line-numbers')) {  // if there's line numbers
+					pre.classList.remove('line-numbers');     // remove line numbers
+			}
+		});
 	}
 
 	async loadSettings() {
