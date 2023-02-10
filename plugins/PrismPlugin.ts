@@ -19,6 +19,8 @@ export abstract class PrismPlugin /*<P extends PrismJSPlugin>*/ {
             .then(this.configure);
     }
 
+    configure(plugin: PrismPluginObject): void {}
+    
     abstract markdownPostProcessor(element: HTMLElement, context: MarkdownPostProcessorContext | null): void;
 
     getPromiseHelper(resolve: (val: PrismPluginObject) => void) {
@@ -28,7 +30,6 @@ export abstract class PrismPlugin /*<P extends PrismJSPlugin>*/ {
             setTimeout(this.getPromiseHelper.bind(this, resolve), 100);
     }   
 
-    abstract configure(plugin: PrismPluginObject): void;
 
     get(): Promise<PrismPluginObject> {
         return new Promise(this.getPromiseHelper.bind(this));

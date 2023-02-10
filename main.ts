@@ -1,9 +1,6 @@
-import { App, MarkdownPostProcessorContext, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import lineNumbers from 'plugins/line-numbers';
 import { PrismObject, PrismPlugin } from 'plugins/PrismPlugin';
-
-// @ts-ignore
-// import lineNumbersJs from './plugins-src/line-numbers.js.txt'
 
 interface MyPluginSettings {
 	mySetting: string;
@@ -16,16 +13,19 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 export default class PrismJSPlugins extends Plugin {
 	static getPrism(): Promise<PrismObject> {
 		const getPrism = (resolve: (val: PrismObject) => void) => {
-			if (global?.Prism) 
-				resolve(global.Prism);
-			else 
-				setTimeout(getPrism.bind(getPrism, resolve), 100);
+			if (global?.Prism)  resolve(global.Prism);
+			else                setTimeout(getPrism.bind(getPrism, resolve), 100);
 		}
 		return new Promise(getPrism);
 	}
 
+	static highlightAll() {
+		PrismJSPlugins.getPrism()
+		.then(Prism => Prism.highlightAll());
+	}
+
 	settings: MyPluginSettings;
-	plugins: Array<PrismPlugin> = [];
+	plugins: PrismPlugin[] = [];
 
 	override async onload() {
 		await this.loadSettings();
@@ -37,23 +37,16 @@ export default class PrismJSPlugins extends Plugin {
 			this.plugins.push(new lineNumbers(Prism));
 			return Promise.all(this.plugins.map(p => p.get()));
 		})
-		.then(plugins => this.plugins.forEach(plugin => {
+		.then(plugins => this.plugins.forEach(plugin =>
 			// manually do initial run of postprocessors
-			plugin.markdownPostProcessor(document.body, null);
-		}))
-		.then(() => this.registerMarkdownPostProcessor(this.markdownPostProcessor));
+			plugin.markdownPostProcessor(document.body, null)
+		))
+		.then(() => this.registerMarkdownPostProcessor((el, ctx) => 
+			this.plugins.forEach(plugin => plugin.markdownPostProcessor(el, ctx))
+		));
 		
 		// Ensure Prism update on PDF export
-		window.matchMedia('print').addEventListener('change', this.highlightAll);
-	}
-
-	highlightAll() {
-		PrismJSPlugins.getPrism()
-		.then(Prism => Prism.highlightAll());
-	}
-
-	markdownPostProcessor(element: HTMLElement, context: MarkdownPostProcessorContext) {
-		this.plugins.forEach(plugin => plugin.markdownPostProcessor(element, context));
+		window.matchMedia('print').addEventListener('change', PrismJSPlugins.highlightAll);
 	}
 
 	override onunload() {
@@ -62,7 +55,7 @@ export default class PrismJSPlugins extends Plugin {
 		
 		this.plugins.forEach(plugin => plugin.remove(codeblocks));
 
-		window.matchMedia('print').removeEventListener('change', this.highlightAll);
+		window.matchMedia('print').removeEventListener('change', PrismJSPlugins.highlightAll);
 	}
 
 	async loadSettings() {

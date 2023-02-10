@@ -1,8 +1,8 @@
 import { PrismObject, PrismPlugin, PrismPluginObject } from "./PrismPlugin"
+import { MarkdownPostProcessorContext } from "obsidian";
 
 // @ts-ignore
 import lineNumbersJs from './js-src/line-numbers.js.txt';
-import { MarkdownPostProcessorContext } from "obsidian";
 
 export default class lineNumbers extends PrismPlugin {
     constructor(Prism: PrismObject) {
