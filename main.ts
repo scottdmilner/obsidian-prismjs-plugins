@@ -2,12 +2,14 @@ import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import lineNumbers from 'plugins/line-numbers';
 import { PrismObject, PrismPlugin } from 'plugins/PrismPlugin';
 
-interface MyPluginSettings {
-	mySetting: string;
+interface PrismJSPluginsSettings {
+	lineNumbers: boolean;
+	wrapLongLines: boolean;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: PrismJSPluginsSettings = {
+	lineNumbers: false,
+	wrapLongLines: false
 }
 
 export default class PrismJSPlugins extends Plugin {
@@ -24,12 +26,12 @@ export default class PrismJSPlugins extends Plugin {
 		.then(Prism => Prism.highlightAll());
 	}
 
-	settings: MyPluginSettings;
+	settings: PrismJSPluginsSettings;
 	plugins: PrismPlugin[] = [];
 
 	override async onload() {
 		await this.loadSettings();
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new PrismJSPluginsSettingTab(this.app, this));
 
 		// load plugins
 		PrismJSPlugins.getPrism()
@@ -78,7 +80,7 @@ export default class PrismJSPlugins extends Plugin {
 // 	}
 // }
 
-class SampleSettingTab extends PluginSettingTab {
+class PrismJSPluginsSettingTab extends PluginSettingTab {
 	plugin: PrismJSPlugins;
 
 	constructor(app: App, plugin: PrismJSPlugins) {
@@ -91,18 +93,17 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
+		containerEl.createEl('h2', {text: 'Settings for PrismJS Plugins'});
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+			.setName('Line Numbers')
+			.setDesc('Enable/disable code blocks on line numbers')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.lineNumbers)
 				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.lineNumbers = value;
 					await this.plugin.saveSettings();
-				}));
+				})
+			);
 	}
 }
