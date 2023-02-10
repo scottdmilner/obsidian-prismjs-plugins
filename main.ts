@@ -23,7 +23,7 @@ export default class PrismJSPlugins extends Plugin {
 
 	static highlightAll() {
 		PrismJSPlugins.getPrism()
-		.then(Prism => Prism.highlightAll());
+		.then((Prism) => Prism.highlightAll());
 	}
 
 	settings: PrismJSPluginsSettings;
@@ -37,14 +37,14 @@ export default class PrismJSPlugins extends Plugin {
 		PrismJSPlugins.getPrism()
 		.then((Prism) => {
 			this.plugins.push(new lineNumbers(Prism));
-			return Promise.all(this.plugins.map(p => p.get()));
+			return Promise.all(this.plugins.map((p) => p.get()));
 		})
-		.then(plugins => this.plugins.forEach(plugin =>
+		.then((plugins) => this.plugins.forEach((plugin) =>
 			// manually do initial run of postprocessors
 			plugin.markdownPostProcessor(document.body, null)
 		))
 		.then(() => this.registerMarkdownPostProcessor((el, ctx) => 
-			this.plugins.forEach(plugin => plugin.markdownPostProcessor(el, ctx))
+			this.plugins.forEach((plugin) => plugin.markdownPostProcessor(el, ctx))
 		));
 		
 		// Ensure Prism update on PDF export
@@ -53,9 +53,9 @@ export default class PrismJSPlugins extends Plugin {
 
 	override onunload() {
 		const codeblocks = Array.from(document.body.querySelectorAll('pre'))
-			.filter(pre => pre.children[0].tagName == 'CODE');
+			.filter((pre) => pre.children[0].tagName == 'CODE');
 		
-		this.plugins.forEach(plugin => plugin.remove(codeblocks));
+		this.plugins.forEach((plugin) => plugin.remove(codeblocks));
 
 		window.matchMedia('print').removeEventListener('change', PrismJSPlugins.highlightAll);
 	}
@@ -98,7 +98,7 @@ class PrismJSPluginsSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Line Numbers')
 			.setDesc('Enable/disable code blocks on line numbers')
-			.addToggle(toggle => toggle
+			.addToggle((toggle) => toggle
 				.setValue(this.plugin.settings.lineNumbers)
 				.onChange(async (value) => {
 					this.plugin.settings.lineNumbers = value;

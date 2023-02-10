@@ -20,9 +20,9 @@ export default class lineNumbers extends PrismPlugin {
 
     override markdownPostProcessor(element: HTMLElement, context: MarkdownPostProcessorContext | null): void {
         const codeblocks = Array.from(element.querySelectorAll('pre'))
-            .filter(pre => pre.children[0].tagName == 'CODE');
+            .filter((pre) => pre.children[0].tagName == 'CODE');
         
-        codeblocks.forEach(pre => {
+        codeblocks.forEach((pre) => {
             if(!pre.classList.contains('line-numbers'))
                 pre.classList.add('line-numbers');
         });

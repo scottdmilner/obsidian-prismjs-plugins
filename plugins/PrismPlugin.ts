@@ -4,7 +4,7 @@ type ValueOf<T> = T[keyof T];
 export declare type PrismObject = typeof import("prismjs");
 export declare type PrismPluginObject = ValueOf<typeof import("prismjs/index").plugins>
 
-export abstract class PrismPlugin /*<P extends PrismJSPlugin>*/ {
+export abstract class PrismPlugin {
     readonly Prism: PrismObject;
     readonly PLUGIN_ID: string;
     readonly PLUGIN_JS: string
