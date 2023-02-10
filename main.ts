@@ -1,7 +1,9 @@
 import { App, MarkdownPostProcessorContext, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import lineNumbers from 'plugins/line-numbers';
+import { PrismObject, PrismPlugin } from 'plugins/PrismPlugin';
 
 // @ts-ignore
-import lineNumbers from './line-numbers.js.txt'
+// import lineNumbersJs from './plugins-src/line-numbers.js.txt'
 
 interface MyPluginSettings {
 	mySetting: string;
@@ -11,40 +13,18 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	mySetting: 'default'
 }
 
-
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
-	
-	async onload() {
+	plugins: Array<PrismPlugin>;
+	Prism: PrismObject;
+
+	override async onload() {
 		await this.loadSettings();
 
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.plugins = [];
 
-		/**
-		 * Promise helper function to wait until Prism appears in the global 
-		 * 	namespace (the first time Reading View is loaded)
-		 * @param resolve 
-		 */
-		const getPrism = (resolve: (val: typeof global.Prism) => void) => {
-			if (global?.Prism) 
-				resolve(global.Prism);
-			else 
-				setTimeout(getPrism.bind(getPrism, resolve), 100);
-		}
+		this.addSettingTab(new SampleSettingTab(this.app, this));
 		
-		/**
-		 * Promise helper function to wait until the line-numbers plugin
-		 * 	appears in the global namespace
-		 * @param resolve 
-		 */
-		const getLineNumbers = (resolve: (val: typeof global.Prism.plugins.lineNumbers) => void) => {
-			if (global.Prism?.plugins?.lineNumbers) 
-				resolve(global.Prism.plugins.lineNumbers);
-			else 
-				setTimeout(getLineNumbers.bind(getLineNumbers, resolve), 30);
-		}
-		
-		/** */
 		this.registerMarkdownPostProcessor((element: HTMLElement, context: MarkdownPostProcessorContext) => {
 			const codeblocks = element.querySelectorAll('pre');
 			codeblocks.forEach(pre => {
@@ -56,32 +36,44 @@ export default class MyPlugin extends Plugin {
 
 			if (codeblocks.length) {
 				// Force prism update
-				new Promise(getPrism).then((Prism: typeof global.Prism) => Prism.highlightAll());
+				this.getPrism().then((Prism) => Prism.highlightAll());
 			}
 		});
 
 		// wait until Prism loads
-		new Promise(getPrism).then((Prism: typeof global.Prism) => {
-			// Inject line-numbers script
-			const script = document.createElement("script");
-			script.textContent = lineNumbers;
-			script.id = 'line-numbers';
-			document.body.appendChild(script);
+		this.getPrism()
+		.then((prism: PrismObject) => {
+			console.log(prism)
+			this.Prism = prism;
+			this.plugins.push(new lineNumbers(this.Prism));
 			
+			return Promise.all(this.plugins.map(p => p.get()))
+		})
+		.then((plugins) => this.Prism.highlightAll())
+		.then(() => {
 			// Force Prism update on PDF export
 			const printMediaQueryList = window.matchMedia('print');
-			printMediaQueryList.addEventListener('change', (mql: MediaQueryListEvent) => Prism.highlightAll());
-
-			// Configure lineNumbers plugin
-			new Promise(getLineNumbers).then((lineNumbers) => {
-				lineNumbers.assumeViewportIndependence = false;
-				Prism.highlightAll();
-			});
+			printMediaQueryList.addEventListener('change', (mql: MediaQueryListEvent) => this.Prism.highlightAll());
 		});
 
 	}
 
-	onunload() {
+	getPrism() {
+		/**
+		 * Promise helper function to wait until Prism appears in the global 
+		 * 	namespace (the first time Reading View is loaded)
+		 * @param resolve 
+		 */
+		const getPrism = (resolve: (val: PrismObject) => void) => {
+			if (global?.Prism) 
+				resolve(global.Prism);
+			else 
+				setTimeout(getPrism.bind(getPrism, resolve), 100);
+		}
+		return new Promise(getPrism);
+	}
+
+	override onunload() {
 		const codeblocks = document.body.querySelectorAll('pre');
 		codeblocks.forEach(pre => {
 			if (pre.children[0].tagName == 'CODE'             // check that it's a code block
@@ -89,6 +81,10 @@ export default class MyPlugin extends Plugin {
 					pre.classList.remove('line-numbers');     // remove line numbers
 			}
 		});
+
+		const printMediaQueryList = window.matchMedia('print');
+		
+		// printMediaQueryList.removeEventListener('change');
 	}
 
 	async loadSettings() {
