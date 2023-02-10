@@ -1,14 +1,17 @@
+import { MarkdownPostProcessorContext } from "obsidian";
+
 type ValueOf<T> = T[keyof T];
 export declare type PrismObject = typeof import("prismjs");
 export declare type PrismPluginObject = ValueOf<typeof import("prismjs/index").plugins>
 
 export abstract class PrismPlugin /*<P extends PrismJSPlugin>*/ {
-    readonly prism: PrismObject;
+    readonly Prism: PrismObject;
     readonly PLUGIN_ID: string;
     readonly PLUGIN_JS: string
+    script_el?: HTMLScriptElement;
 
-    constructor(prism: PrismObject, plugin_id: string, plugin_js: string) {
-        this.prism = prism
+    constructor(Prism: PrismObject, plugin_id: string, plugin_js: string) {
+        this.Prism = Prism
         this.PLUGIN_ID = plugin_id
         this.PLUGIN_JS = plugin_js;
         
@@ -16,9 +19,11 @@ export abstract class PrismPlugin /*<P extends PrismJSPlugin>*/ {
             .then(this.configure);
     }
 
+    abstract markdownPostProcessor(element: HTMLElement, context: MarkdownPostProcessorContext | null): void;
+
     getPromiseHelper(resolve: (val: PrismPluginObject) => void) {
-        if (this.prism?.plugins?.[this.PLUGIN_ID])
-            resolve(this.prism.plugins[this.PLUGIN_ID]);
+        if (this.Prism?.plugins?.[this.PLUGIN_ID])
+            resolve(this.Prism.plugins[this.PLUGIN_ID]);
         else
             setTimeout(this.getPromiseHelper.bind(this, resolve), 100);
     }   
@@ -30,21 +35,25 @@ export abstract class PrismPlugin /*<P extends PrismJSPlugin>*/ {
     }
 
     inject(): PrismPluginObject {
-        if (!document.getElementById(this.PLUGIN_ID)) {
-            const script = document.createElement('SCRIPT');
-            script.textContent = this.PLUGIN_JS;
-            script.id = this.PLUGIN_ID;
-            document.body.appendChild(script);
+        if (!this.script_el) {
+            this.script_el = document.createElement('SCRIPT') as HTMLScriptElement;
+            this.script_el.textContent = this.PLUGIN_JS;
+            this.script_el.id = this.PLUGIN_ID;
+            document.body.appendChild(this.script_el);
         }
         return this.get();
     }
 
-    remove(): boolean {
-        const script = document.getElementById(this.PLUGIN_ID);
-        if (script) {
-            document.removeChild(script);
-            return true;
+    abstract purgeHTMLPre(pre: HTMLPreElement): void;
+
+    remove(codeblocks: HTMLPreElement[]) {
+        if (this.script_el) {
+            document.body.removeChild(this.script_el);
+            delete this.script_el;
+            
+            codeblocks.forEach(this.purgeHTMLPre);
         }
-        return false;
+
+        delete this.Prism.plugins[this.PLUGIN_ID];
     }
 }

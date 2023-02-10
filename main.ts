@@ -13,57 +13,8 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	mySetting: 'default'
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-	plugins: Array<PrismPlugin>;
-	Prism: PrismObject;
-
-	override async onload() {
-		await this.loadSettings();
-
-		this.plugins = [];
-
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-		
-		this.registerMarkdownPostProcessor((element: HTMLElement, context: MarkdownPostProcessorContext) => {
-			const codeblocks = element.querySelectorAll('pre');
-			codeblocks.forEach(pre => {
-				if (pre.children[0].tagName == 'CODE'              // check that it's a code block
-					&& !pre.classList.contains('line-numbers')) {  // if there's no line numbers yet
-						pre.classList.add('line-numbers');         // add line numbers
-				}
-			});
-
-			if (codeblocks.length) {
-				// Force prism update
-				this.getPrism().then((Prism) => Prism.highlightAll());
-			}
-		});
-
-		// wait until Prism loads
-		this.getPrism()
-		.then((prism: PrismObject) => {
-			console.log(prism)
-			this.Prism = prism;
-			this.plugins.push(new lineNumbers(this.Prism));
-			
-			return Promise.all(this.plugins.map(p => p.get()))
-		})
-		.then((plugins) => this.Prism.highlightAll())
-		.then(() => {
-			// Force Prism update on PDF export
-			const printMediaQueryList = window.matchMedia('print');
-			printMediaQueryList.addEventListener('change', (mql: MediaQueryListEvent) => this.Prism.highlightAll());
-		});
-
-	}
-
-	getPrism() {
-		/**
-		 * Promise helper function to wait until Prism appears in the global 
-		 * 	namespace (the first time Reading View is loaded)
-		 * @param resolve 
-		 */
+export default class PrismJSPlugins extends Plugin {
+	static getPrism(): Promise<PrismObject> {
 		const getPrism = (resolve: (val: PrismObject) => void) => {
 			if (global?.Prism) 
 				resolve(global.Prism);
@@ -73,18 +24,45 @@ export default class MyPlugin extends Plugin {
 		return new Promise(getPrism);
 	}
 
-	override onunload() {
-		const codeblocks = document.body.querySelectorAll('pre');
-		codeblocks.forEach(pre => {
-			if (pre.children[0].tagName == 'CODE'             // check that it's a code block
-				&& pre.classList.contains('line-numbers')) {  // if there's line numbers
-					pre.classList.remove('line-numbers');     // remove line numbers
-			}
-		});
+	settings: MyPluginSettings;
+	plugins: Array<PrismPlugin> = [];
 
-		const printMediaQueryList = window.matchMedia('print');
+	override async onload() {
+		await this.loadSettings();
+		this.addSettingTab(new SampleSettingTab(this.app, this));
+
+		// load plugins
+		PrismJSPlugins.getPrism()
+		.then((Prism) => {
+			this.plugins.push(new lineNumbers(Prism));
+			return Promise.all(this.plugins.map(p => p.get()));
+		})
+		.then(plugins => this.plugins.forEach(plugin => {
+			// manually do initial run of postprocessors
+			plugin.markdownPostProcessor(document.body, null);
+		}))
+		.then(() => this.registerMarkdownPostProcessor(this.markdownPostProcessor));
 		
-		// printMediaQueryList.removeEventListener('change');
+		// Ensure Prism update on PDF export
+		window.matchMedia('print').addEventListener('change', this.highlightAll);
+	}
+
+	highlightAll() {
+		PrismJSPlugins.getPrism()
+		.then(Prism => Prism.highlightAll());
+	}
+
+	markdownPostProcessor(element: HTMLElement, context: MarkdownPostProcessorContext) {
+		this.plugins.forEach(plugin => plugin.markdownPostProcessor(element, context));
+	}
+
+	override onunload() {
+		const codeblocks = Array.from(document.body.querySelectorAll('pre'))
+			.filter(pre => pre.children[0].tagName == 'CODE');
+		
+		this.plugins.forEach(plugin => plugin.remove(codeblocks));
+
+		window.matchMedia('print').removeEventListener('change', this.highlightAll);
 	}
 
 	async loadSettings() {
@@ -108,9 +86,9 @@ export default class MyPlugin extends Plugin {
 // }
 
 class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+	plugin: PrismJSPlugins;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: PrismJSPlugins) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
