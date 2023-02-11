@@ -1,16 +1,21 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import lineNumbers from 'plugins/line-numbers';
-import { PrismObject, PrismPlugin } from 'plugins/PrismPlugin';
+import { PrismObject, PrismPlugin, PrismPluginSettings, PrismPluginType } from 'plugins/PrismPlugin';
+
+const pluginIndex: Record<string, PrismPluginType> = {
+	"lineNumbers": lineNumbers,
+}
 
 interface PrismJSPluginsSettings {
-	lineNumbers: boolean;
-	wrapLongLines: boolean;
+	plugins: Record<string, PrismPluginSettings>;
 }
 
-const DEFAULT_SETTINGS: PrismJSPluginsSettings = {
-	lineNumbers: false,
-	wrapLongLines: false
-}
+const DEFAULT_SETTINGS: PrismJSPluginsSettings = { 
+	plugins: {}
+};
+Object.entries(pluginIndex).forEach(([plugin_id, plugin]) => {
+	DEFAULT_SETTINGS.plugins[plugin_id] = plugin.defaultSettings;
+});
 
 export default class PrismJSPlugins extends Plugin {
 	static getPrism(): Promise<PrismObject> {
@@ -27,7 +32,7 @@ export default class PrismJSPlugins extends Plugin {
 	}
 
 	settings: PrismJSPluginsSettings;
-	plugins: PrismPlugin[] = [];
+	plugins: Record<string, PrismPlugin> = {};
 
 	override async onload() {
 		await this.loadSettings();
@@ -36,15 +41,13 @@ export default class PrismJSPlugins extends Plugin {
 		// load plugins
 		PrismJSPlugins.getPrism()
 		.then((Prism) => {
-			this.plugins.push(new lineNumbers(Prism));
-			return Promise.all(this.plugins.map((p) => p.get()));
+			Object.entries(pluginIndex).forEach(([plugin_id, plugin]) => {
+				this.plugins[plugin_id] = new plugin(Prism, this.settings.plugins[plugin_id]);
+			});
+			return Promise.all(Object.values(this.plugins).map((p) => p.get()));
 		})
-		.then((plugins) => this.plugins.forEach((plugin) =>
-			// manually do initial run of postprocessors
-			plugin.markdownPostProcessor(document.body, null)
-		))
 		.then(() => this.registerMarkdownPostProcessor((el, ctx) => 
-			this.plugins.forEach((plugin) => plugin.markdownPostProcessor(el, ctx))
+			Object.values(this.plugins).forEach((plugin) => plugin.markdownPostProcessor(el, ctx))
 		));
 		
 		// Ensure Prism update on PDF export
@@ -55,7 +58,7 @@ export default class PrismJSPlugins extends Plugin {
 		const codeblocks = Array.from(document.body.querySelectorAll('pre'))
 			.filter((pre) => pre.children[0].tagName == 'CODE');
 		
-		this.plugins.forEach((plugin) => plugin.remove(codeblocks));
+		Object.values(this.plugins).forEach((plugin) => plugin.remove(codeblocks));
 
 		window.matchMedia('print').removeEventListener('change', PrismJSPlugins.highlightAll);
 	}
@@ -90,20 +93,25 @@ class PrismJSPluginsSettingTab extends PluginSettingTab {
 
 	display(): void {
 		const {containerEl} = this;
-
 		containerEl.empty();
 
 		containerEl.createEl('h2', {text: 'Settings for PrismJS Plugins'});
 
-		new Setting(containerEl)
-			.setName('Line Numbers')
-			.setDesc('Enable/disable code blocks on line numbers')
-			.addToggle((toggle) => toggle
-				.setValue(this.plugin.settings.lineNumbers)
-				.onChange(async (value) => {
-					this.plugin.settings.lineNumbers = value;
-					await this.plugin.saveSettings();
-				})
-			);
+		Object.entries(this.plugin.settings.plugins).forEach(([plugin_id, pluginSettings]) => {
+			containerEl.createEl('h3', {text: pluginSettings.enabled.name});
+			
+			Object.entries(pluginSettings).forEach(([setting_id, setting]) => {
+				if (isBoolean(this.plugin.settings.plugins[plugin_id][setting_id as keyof PrismPluginSettings].value)) {
+					new Setting(containerEl).setName(setting.name).setDesc(setting.desc)
+					.addToggle((toggle) => toggle
+					.setValue(this.plugin.settings.plugins[plugin_id][setting_id as keyof PrismPluginSettings].value)
+					.onChange(async (value) => {
+						this.plugin.settings.plugins[plugin_id][setting_id as keyof PrismPluginSettings].value = value;
+						await this.plugin.saveSettings();
+						this.plugin.plugins[plugin_id].updateSettings(pluginSettings);
+					}));
+				}
+			});
+		});
 	}
 }

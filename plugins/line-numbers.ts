@@ -1,12 +1,26 @@
-import { PrismObject, PrismPlugin, PrismPluginObject } from "./PrismPlugin"
+import { PluginSetting, PrismObject, PrismPlugin, PrismPluginObject, PrismPluginSettings } from "./PrismPlugin"
 import { MarkdownPostProcessorContext } from "obsidian";
 
 // @ts-ignore
 import lineNumbersJs from './js-src/line-numbers.js.txt';
 
+interface lineNumbersSettings extends PrismPluginSettings {
+    wrapLongLines: PluginSetting<boolean>;
+}
 export default class lineNumbers extends PrismPlugin {
-    constructor(Prism: PrismObject) {
-        super(Prism, 'lineNumbers', lineNumbersJs);
+    static override defaultSettings: lineNumbersSettings = {
+        ...super.defaultSettings,
+        wrapLongLines: {
+            name: "Wrap long lines",
+            desc: "Wrap long lines instead adding a horizontal scroll bar. This will always happen on PDF export.",
+            value: false,
+        },
+    }
+
+    override settings: lineNumbersSettings;
+
+    constructor(Prism: PrismObject, settings: lineNumbersSettings) {
+        super(Prism, 'lineNumbers', lineNumbersJs, settings);
     }
 
     override configure(lineNumbers: PrismPluginObject): void {
